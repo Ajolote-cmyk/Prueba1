@@ -1,2 +1,3 @@
-print("lo he logrado")
-print("he logrado aprender el loadstring")
+while true do
+  game.Workspace.Rig.Head.Reflectance = 0
+end
