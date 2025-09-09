@@ -1,11 +1,12 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
--- Función para añadir Highlight a cualquier modelo
+-- Función para añadir Highlight
 local function addHighlight(model)
 	if not model:FindFirstChild("Highlight") then
 		local highlight = Instance.new("Highlight")
-		highlight.FillColor = Color3.fromRGB(0, 255, 255) -- Cian
+		highlight.FillColor = Color3.fromRGB(0, 255, 255)
 		highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 		highlight.FillTransparency = 0.5
 		highlight.OutlineTransparency = 0
@@ -13,7 +14,7 @@ local function addHighlight(model)
 	end
 end
 
--- Función recursiva que aplica Highlight a un objeto y todos sus modelos/partes internas
+-- Función recursiva para iluminar modelos y submodelos
 local function highlightRecursive(obj)
 	if obj:IsA("Model") then
 		addHighlight(obj)
@@ -25,50 +26,35 @@ local function highlightRecursive(obj)
 	end
 end
 
--- Función que ilumina todos los Spirits dentro de una carpeta
+-- Función que recorre todos los Spirits de un piso
 local function illuminateSpiritsFolder(spiritsFolder)
 	for _, obj in pairs(spiritsFolder:GetDescendants()) do
 		if obj:IsA("Model") or obj:IsA("BasePart") then
 			highlightRecursive(obj)
 		end
 	end
-
-	-- Detectar Spirits nuevos en cualquier nivel
-	spiritsFolder.DescendantAdded:Connect(function(newObj)
-		if newObj:IsA("Model") or newObj:IsA("BasePart") then
-			highlightRecursive(newObj)
-		end
-	end)
 end
 
--- Función que observa todos los pisos en workspace
-local function observeFloors()
-	-- Puedes cambiar "workspace" por una carpeta específica si tus pisos están en una carpeta llamada "Floors"
-	for _, floor in pairs(workspace:GetChildren()) do
-		if floor:IsA("Folder") or floor:IsA("Model") then
-			local spiritsFolder = floor:FindFirstChild("Spirits")
-			if spiritsFolder then
-				illuminateSpiritsFolder(spiritsFolder)
+-- Función que revisa todos los pisos periódicamente
+local function observeFloorsPeriodically()
+	while true do
+		for _, floor in pairs(workspace:GetChildren()) do
+			if floor:IsA("Folder") or floor:IsA("Model") then
+				local spiritsFolder = floor:FindFirstChild("Spirits")
+				if spiritsFolder then
+					illuminateSpiritsFolder(spiritsFolder)
+				end
 			end
 		end
+		task.wait(1) -- revisa cada segundo
 	end
-
-	-- Detectar pisos nuevos agregados durante la partida
-	workspace.ChildAdded:Connect(function(newFloor)
-		if newFloor:IsA("Folder") or newFloor:IsA("Model") then
-			local spiritsFolder = newFloor:WaitForChild("Spirits", 5) -- espera hasta 5 segundos
-			if spiritsFolder then
-				illuminateSpiritsFolder(spiritsFolder)
-			end
-		end
-	end)
 end
 
 -- Ejecutar al cargar el jugador
 if player.Character then
-	task.defer(observeFloors)
+	task.defer(observeFloorsPeriodically)
 else
 	player.CharacterAdded:Connect(function()
-		task.defer(observeFloors)
+		task.defer(observeFloorsPeriodically)
 	end)
 end
