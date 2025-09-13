@@ -2,7 +2,7 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local workspace = game:GetService("Workspace")
 
--- Función general para agregar Highlight
+-- Crear Highlight
 local function addHighlight(model, color, transparency)
 	if not model:FindFirstChild("Highlight") then
 		local highlight = Instance.new("Highlight")
@@ -14,85 +14,89 @@ local function addHighlight(model, color, transparency)
 	end
 end
 
--- Función recursiva para todos los modelos
-local function highlightModels(parent, color, transparency)
-	for _, child in ipairs(parent:GetChildren()) do
-		if child:IsA("Model") then
-			addHighlight(child, color, transparency)
-			highlightModels(child, color, transparency)
-		end
-	end
-end
-
--- ===== Items/Spawns =====
-local function processSpawn(spawnPart)
-	highlightModels(spawnPart, Color3.fromRGB(255, 215, 0), 0.3)
-	spawnPart.ChildAdded:Connect(function(newChild)
-		if newChild:IsA("Model") then
-			addHighlight(newChild, Color3.fromRGB(255, 215, 0), 0.3)
-			highlightModels(newChild, Color3.fromRGB(255, 215, 0), 0.3)
-		end
-	end)
-end
-
+-- ====== Items / Spawns ======
 local function observeItemsInFloor(floor)
-	local success, itemsFolder = pcall(function()
-		return floor:WaitForChild("Items", 2):WaitForChild("Items", 2)
+	local itemsMain = floor:WaitForChild("Items", 2)
+	if not itemsMain then return end
+
+	local itemsFolder = itemsMain:WaitForChild("Items", 2)
+	if not itemsFolder then return end
+
+	-- Cuando aparezca un Spawn y dentro de él un Model
+	itemsFolder.ChildAdded:Connect(function(obj)
+		if obj:IsA("BasePart") and obj.Name == "Spawn" then
+			obj.ChildAdded:Connect(function(child)
+				if child:IsA("Model") then
+					addHighlight(child, Color3.fromRGB(255, 215, 0), 0.3)
+				end
+			end)
+		end
 	end)
-	if success and itemsFolder then
-		for _, obj in ipairs(itemsFolder:GetChildren()) do
-			if obj:IsA("BasePart") and obj.Name == "Spawn" then
-				processSpawn(obj)
+
+	-- Procesar lo que ya estaba
+	for _, obj in ipairs(itemsFolder:GetChildren()) do
+		if obj:IsA("BasePart") and obj.Name == "Spawn" then
+			for _, child in ipairs(obj:GetChildren()) do
+				if child:IsA("Model") then
+					addHighlight(child, Color3.fromRGB(255, 215, 0), 0.3)
+				end
 			end
 		end
-		itemsFolder.ChildAdded:Connect(function(newObj)
-			if newObj:IsA("BasePart") and newObj.Name == "Spawn" then
-				processSpawn(newObj)
-			end
-		end)
 	end
 end
 
--- ===== Enemigos/Spirits =====
-local function illuminateSpiritsFolder(spiritsFolder)
+-- ====== Enemigos / Spirits ======
+local function observeSpiritsInFloor(floor)
+	local spiritsFolder = floor:WaitForChild("Spirits", 2)
+	if not spiritsFolder then return end
+
+	-- Detectar enemigos que ya existen
 	for _, enemy in ipairs(spiritsFolder:GetChildren()) do
 		if enemy:IsA("Model") and enemy:FindFirstChild("HumanoidRootPart") then
 			addHighlight(enemy, Color3.fromRGB(0, 255, 255), 0.5)
 		end
 	end
-	spiritsFolder.ChildAdded:Connect(function(newEnemy)
-		if newEnemy:IsA("Model") and newEnemy:FindFirstChild("HumanoidRootPart") then
-			addHighlight(newEnemy, Color3.fromRGB(0, 255, 255), 0.5)
+
+	-- Detectar enemigos nuevos
+	spiritsFolder.ChildAdded:Connect(function(enemy)
+		if enemy:IsA("Model") then
+			local hrp = enemy:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				addHighlight(enemy, Color3.fromRGB(0, 255, 255), 0.5)
+			else
+				enemy.ChildAdded:Connect(function(part)
+					if part.Name == "HumanoidRootPart" then
+						addHighlight(enemy, Color3.fromRGB(0, 255, 255), 0.5)
+					end
+				end)
+			end
 		end
 	end)
 end
 
-local function observeSpiritsInFloor(floor)
-	local spiritsFolder = floor:FindFirstChild("Spirits")
-	if spiritsFolder then
-		illuminateSpiritsFolder(spiritsFolder)
-	end
-end
-
--- ===== Observar todos los pisos =====
+-- ====== Observar todos los pisos ======
 local function observeFloors()
-	-- Procesar pisos existentes
+	-- Procesar pisos que ya existen
 	for _, floor in ipairs(workspace:GetChildren()) do
 		if floor:IsA("Folder") or floor:IsA("Model") then
 			observeItemsInFloor(floor)
 			observeSpiritsInFloor(floor)
 		end
 	end
-	-- Detectar pisos nuevos
+
+	-- Procesar pisos nuevos
 	workspace.ChildAdded:Connect(function(newFloor)
 		if newFloor:IsA("Folder") or newFloor:IsA("Model") then
-			observeItemsInFloor(newFloor)
-			observeSpiritsInFloor(newFloor)
+			-- damos chance a que carguen sus carpetas
+			task.delay(0.5, function()
+				observeItemsInFloor(newFloor)
+				observeSpiritsInFloor(newFloor)
+			end)
 		end
 	end)
 end
 
--- Ejecutar cuando el jugador cargue
+-- Ejecutar
 if player.Character then
 	task.defer(observeFloors)
 else
