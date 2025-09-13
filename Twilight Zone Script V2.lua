@@ -2,7 +2,7 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local workspace = game:GetService("Workspace")
 
--- Crear Highlight
+-- V2Crear Highlight
 local function addHighlight(model, color, transparency)
 	if not model:FindFirstChild("Highlight") then
 		local highlight = Instance.new("Highlight")
