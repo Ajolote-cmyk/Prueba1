@@ -32,6 +32,8 @@ local function startLoop(character)
         end
 
         -- Forzar la muerte del jugador
+        
+        wait(4)
         humanoid.Health = 0
 
         wait(6)
