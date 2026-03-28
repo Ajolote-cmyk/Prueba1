@@ -1,0 +1,1743 @@
+-- ============================
+-- HUNTINGTON PARASITE UI - SISTEMA DE APUNTADO CON PREDICCIÓN
+-- ============================
+
+local player = game.Players.LocalPlayer
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+gui.Name = "HuntingtonParasiteUI"
+gui.ResetOnSpawn = false
+
+-- ============================
+-- CONFIGURACIÓN VISUAL
+-- ============================
+local CONFIG = {
+    colors = {
+        background = Color3.fromRGB(0, 0, 0),
+        sidebar = Color3.fromRGB(15, 15, 15),
+        header = Color3.fromRGB(26, 26, 26),
+        content = Color3.fromRGB(26, 26, 26),
+        text = Color3.fromRGB(255, 255, 255),
+        button_default = Color3.fromRGB(50, 50, 50),
+        button_success = Color3.fromRGB(0, 150, 0),
+        button_danger = Color3.fromRGB(150, 0, 0),
+        button_warning = Color3.fromRGB(255, 255, 0),
+        button_info = Color3.fromRGB(80, 80, 80),
+        accent = Color3.fromRGB(0, 200, 255),
+        target_color = Color3.fromRGB(255, 50, 50),
+    },
+    
+    sizes = {
+        main = UDim2.new(0.6, 0, 0.7, 0),
+        logo = UDim2.new(0, 40, 0, 40),
+        sidebar_width = 0.25,
+        header_height = 0.1,
+        button_height = 40,
+        scroll_button_height = 35,
+    },
+    
+    positions = {
+        logo = UDim2.new(0, 10, 0, 10),
+        main = UDim2.new(0, 10, 0, 10),
+    },
+    
+    texts = {
+        title = "Huntington Parasite",
+        logo_image = "rbxassetid://6031068433",
+    }
+}
+
+-- ============================
+-- CREACIÓN DE LA UI BASE
+-- ============================
+
+-- Logo minimizado
+local LogoButton = Instance.new("ImageButton")
+LogoButton.Size = CONFIG.sizes.logo
+LogoButton.Position = CONFIG.positions.logo
+LogoButton.BackgroundTransparency = 1
+LogoButton.Image = CONFIG.texts.logo_image
+LogoButton.Parent = gui
+
+-- Frame principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = CONFIG.sizes.main
+MainFrame.Position = CONFIG.positions.main
+MainFrame.BackgroundColor3 = CONFIG.colors.background
+MainFrame.BorderSizePixel = 0
+MainFrame.Visible = false
+MainFrame.Parent = gui
+
+-- Header
+local Header = Instance.new("Frame", MainFrame)
+Header.Size = UDim2.new(1, 0, CONFIG.sizes.header_height, 0)
+Header.BackgroundColor3 = CONFIG.colors.header
+
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(0.8, 0, 1, 0)
+Title.Text = CONFIG.texts.title
+Title.TextColor3 = CONFIG.colors.text
+Title.Font = Enum.Font.Roboto
+Title.TextScaled = true
+Title.BackgroundTransparency = 1
+
+local MinButton = Instance.new("TextButton", Header)
+MinButton.Size = UDim2.new(0.2, 0, 1, 0)
+MinButton.Position = UDim2.new(0.8, 0, 0, 0)
+MinButton.Text = "-"
+MinButton.BackgroundColor3 = CONFIG.colors.header
+MinButton.TextColor3 = CONFIG.colors.text
+MinButton.Font = Enum.Font.Roboto
+MinButton.TextScaled = true
+
+-- Sidebar
+local Sidebar = Instance.new("Frame", MainFrame)
+Sidebar.Size = UDim2.new(CONFIG.sizes.sidebar_width, 0, 1 - CONFIG.sizes.header_height, 0)
+Sidebar.Position = UDim2.new(0, 0, CONFIG.sizes.header_height, 0)
+Sidebar.BackgroundColor3 = CONFIG.colors.sidebar
+
+local SidebarLayout = Instance.new("UIListLayout", Sidebar)
+SidebarLayout.Padding = UDim.new(0, 5)
+SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- ContentFrame
+local ContentFrame = Instance.new("Frame", MainFrame)
+ContentFrame.Size = UDim2.new(1 - CONFIG.sizes.sidebar_width, 0, 1 - CONFIG.sizes.header_height, 0)
+ContentFrame.Position = UDim2.new(CONFIG.sizes.sidebar_width, 0, CONFIG.sizes.header_height, 0)
+ContentFrame.BackgroundColor3 = CONFIG.colors.content
+
+-- ============================
+-- SISTEMA DE SECCIONES
+-- ============================
+
+local SECTIONS = {}
+
+function registerSection(name, func, order)
+    table.insert(SECTIONS, {
+        name = name,
+        func = func,
+        order = order or #SECTIONS + 1
+    })
+    table.sort(SECTIONS, function(a, b) return a.order < b.order end)
+end
+
+function rebuildSidebar()
+    Sidebar:ClearAllChildren()
+    
+    for _, section in ipairs(SECTIONS) do
+        local btn = Instance.new("TextButton", Sidebar)
+        btn.Size = UDim2.new(1, 0, 0, CONFIG.sizes.button_height)
+        btn.Text = section.name
+        btn.BackgroundColor3 = CONFIG.colors.button_default
+        btn.TextColor3 = CONFIG.colors.text
+        btn.Font = Enum.Font.Roboto
+        btn.TextScaled = true
+        btn.LayoutOrder = section.order
+        
+        btn.MouseButton1Click:Connect(function()
+            print("[UI] Opening section: "..section.name)
+            section.func()
+        end)
+    end
+end
+
+-- ============================
+-- FUNCIONES AUXILIARES UI
+-- ============================
+
+function createLabel(parent, text, size, position, color)
+    local label = Instance.new("TextLabel", parent)
+    label.Size = size or UDim2.new(1, 0, 0.1, 0)
+    if position then label.Position = position end
+    label.Text = text
+    label.TextColor3 = color or CONFIG.colors.text
+    label.Font = Enum.Font.Roboto
+    label.TextScaled = true
+    label.BackgroundTransparency = 1
+    return label
+end
+
+function createButton(parent, text, yPos, callback, bgColor, size)
+    local button = Instance.new("TextButton", parent)
+    button.Size = size or UDim2.new(0.5, 0, 0.15, 0)
+    button.Position = UDim2.new(0.25, 0, yPos, 0)
+    button.BackgroundColor3 = bgColor or CONFIG.colors.button_default
+    button.TextColor3 = CONFIG.colors.text
+    button.Font = Enum.Font.Roboto
+    button.TextScaled = true
+    button.Text = text
+    
+    if callback then
+        button.MouseButton1Click:Connect(function()
+            callback(button)
+        end)
+    end
+    
+    return button
+end
+
+function createScrollingSection(parent, title, createContents)
+    parent:ClearAllChildren()
+    
+    local yOffset = 0
+    
+    if title then
+        local titleLabel = Instance.new("TextLabel", parent)
+        titleLabel.Size = UDim2.new(1, 0, 0.08, 0)
+        titleLabel.Text = title
+        titleLabel.TextColor3 = CONFIG.colors.text
+        titleLabel.Font = Enum.Font.Roboto
+        titleLabel.TextScaled = true
+        titleLabel.BackgroundTransparency = 1
+        yOffset = 0.08
+    end
+    
+    local scrollFrame = Instance.new("ScrollingFrame", parent)
+    scrollFrame.Size = UDim2.new(1, 0, 1 - yOffset, 0)
+    scrollFrame.Position = UDim2.new(0, 0, yOffset, 0)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 10
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    
+    local layout = Instance.new("UIListLayout", scrollFrame)
+    layout.Padding = UDim.new(0, 10)
+    layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+    end)
+    
+    if createContents then
+        createContents(scrollFrame, layout)
+    end
+    
+    task.wait()
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+    
+    return scrollFrame, layout
+end
+
+function createScrollingButton(scrollFrame, text, callback, bgColor, order)
+    local button = Instance.new("TextButton", scrollFrame)
+    button.Size = UDim2.new(0.8, 0, 0, CONFIG.sizes.scroll_button_height)
+    button.BackgroundColor3 = bgColor or CONFIG.colors.button_default
+    button.TextColor3 = CONFIG.colors.text
+    button.Font = Enum.Font.Roboto
+    button.TextScaled = true
+    button.Text = text
+    if order then button.LayoutOrder = order end
+    
+    if callback then
+        button.MouseButton1Click:Connect(function()
+            callback(button)
+        end)
+    end
+    
+    return button
+end
+
+-- ============================
+-- VARIABLES GLOBALES
+-- ============================
+
+local scriptActive = false
+local loopThread
+local deathThread = nil
+local deathCancelled = false
+local deathActive = false
+
+local highlights = {
+    npc = true,
+    infected = true,
+    puppet = true
+}
+
+local boundaries = { xmin = -21, xmax = 35, zmin = 30, zmax = 86 }
+
+-- ============================
+-- FUNCIONES DE TELETRANSPORTE
+-- ============================
+
+local function insideSquare(pos)
+    return pos.X >= boundaries.xmin and pos.X <= boundaries.xmax
+       and pos.Z >= boundaries.zmin and pos.Z <= boundaries.zmax
+end
+
+local function randomPositionInside()
+    local basePos = Vector3.new(8,6,59)
+    local offsetX = math.random(-5,5)
+    local offsetZ = math.random(-5,5)
+    return basePos + Vector3.new(offsetX,0,offsetZ)
+end
+
+local function startLoop(character)
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    local humanoid = character:WaitForChild("Humanoid")
+
+    while scriptActive and humanoid.Parent do
+        local pos = hrp.Position
+        if not insideSquare(pos) then
+            hrp.CFrame = CFrame.new(randomPositionInside())
+        end
+        task.wait(1)
+    end
+end
+
+-- ============================
+-- FUNCIONES DE INFECCIÓN
+-- ============================
+
+local function getMyInfectionType()
+    if player.Character then
+        local infectionValue = player.Character:FindFirstChild("InfectionType")
+        if infectionValue then
+            if infectionValue:IsA("StringValue") then
+                return infectionValue.Value
+            elseif infectionValue:IsA("BoolValue") then
+                return infectionValue.Value and "true" or "false"
+            elseif infectionValue:IsA("NumberValue") then
+                return tostring(infectionValue.Value)
+            end
+        end
+    end
+    return nil
+end
+
+-- ============================
+-- FUNCIONES DE MUERTE
+-- ============================
+
+local function killPlayer(humanoid)
+    if not humanoid or not humanoid.Parent then return false end
+    
+    local success = false
+    
+    pcall(function()
+        humanoid.Health = 0
+        success = true
+    end)
+    
+    if not success or humanoid.Health > 0 then
+        task.wait(0.5)
+        pcall(function()
+            humanoid.Health = 0
+            success = true
+        end)
+    end
+    
+    if not success or humanoid.Health > 0 then
+        pcall(function()
+            if player.Character then
+                player.Character:BreakJoints()
+                success = true
+            end
+        end)
+    end
+    
+    return success
+end
+
+local function killAfterDelay(character)
+    if deathActive then
+        deathCancelled = true
+        deathActive = false
+        deathThread = nil
+    end
+    
+    deathCancelled = false
+    deathActive = true
+    
+    local infectionType = getMyInfectionType()
+    if infectionType == "Puppeteer" then
+        print("[Sistema] Muerte cancelada - Infectado por Puppeteer")
+        deathActive = false
+        return
+    end
+    
+    print("[Sistema] Secuencia de muerte iniciada - Morirás en 2 segundos")
+    
+    task.spawn(function()
+        for i = 1, 2 do
+            if deathCancelled or not deathActive then
+                print("[Sistema] Muerte cancelada")
+                deathActive = false
+                return
+            end
+            
+            local currentInfection = getMyInfectionType()
+            if currentInfection == "Puppeteer" then
+                print("[Sistema] Muerte cancelada - Te convertiste en Puppeteer")
+                deathActive = false
+                return
+            end
+            
+            task.wait(1)
+        end
+        
+        if deathCancelled or not deathActive then 
+            deathActive = false
+            return 
+        end
+        
+        local finalInfection = getMyInfectionType()
+        if finalInfection == "Puppeteer" then
+            print("[Sistema] Muerte cancelada - Puppeteer detectado")
+            deathActive = false
+            return
+        end
+        
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            local humanoid = player.Character.Humanoid
+            local success = killPlayer(humanoid)
+            
+            if success then
+                print("[Sistema] Jugador eliminado")
+            else
+                print("[Sistema] Error al eliminar jugador")
+            end
+        end
+        
+        deathActive = false
+        deathThread = nil
+    end)
+end
+
+local function cancelDeath()
+    if deathActive then
+        deathCancelled = true
+        deathActive = false
+        deathThread = nil
+        print("[Sistema] Muerte cancelada manualmente")
+        return true
+    else
+        print("[Sistema] No hay secuencia de muerte activa")
+        return false
+    end
+end
+
+local function watchInfectionType()
+    if player.Character then
+        local infectionValue = player.Character:FindFirstChild("InfectionType")
+        if infectionValue then
+            infectionValue.Changed:Connect(function()
+                local newValue = getMyInfectionType()
+                if newValue == "Puppeteer" then
+                    cancelDeath()
+                end
+            end)
+        end
+        
+        player.Character.ChildAdded:Connect(function(child)
+            if child.Name == "InfectionType" then
+                task.wait(0.1)
+                if getMyInfectionType() == "Puppeteer" then
+                    cancelDeath()
+                end
+                
+                child.Changed:Connect(function()
+                    if getMyInfectionType() == "Puppeteer" then
+                        cancelDeath()
+                    end
+                end)
+            end
+        end)
+    end
+end
+
+-- ============================
+-- FUNCIONES DE PUPPET
+-- ============================
+
+local function hasPunch(character)
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA("Tool") and child.Name:lower() == "punch" then
+            return true
+        end
+    end
+    return false
+end
+
+local function hasSlash(character)
+    for _, child in ipairs(character:GetChildren()) do
+        if child:IsA("Tool") and child.Name:lower() == "slash" then
+            return true
+        end
+    end
+    return false
+end
+
+local function getPuppetLevel(character)
+    if not character then return 0 end
+    
+    local level = 0
+    
+    local puppetValue = character:FindFirstChild("Puppet")
+    if puppetValue and puppetValue:IsA("BoolValue") and puppetValue.Value == true then
+        level = 1
+    else
+        return 0
+    end
+    
+    local evolutionModel = character:FindFirstChild("PuppetEvolution1")
+    if evolutionModel and evolutionModel:IsA("Model") then
+        if evolutionModel:FindFirstChild("TorsoSetter") then
+            level = 2
+        else
+            for _, descendant in ipairs(evolutionModel:GetDescendants()) do
+                if descendant.Name == "TorsoSetter" then
+                    level = 2
+                    break
+                end
+            end
+        end
+    end
+    
+    if level >= 2 then
+        if hasPunch(character) then
+            level = 3
+        end
+    end
+    
+    if level >= 3 then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid and humanoid.WalkSpeed >= 18 then
+            level = 4
+        end
+    end
+    
+    return level
+end
+
+local function getPuppetDisplayName(character, playerName)
+    local level = getPuppetLevel(character)
+    if level > 0 then
+        return "PUPPET Lv."..level..": "..playerName
+    else
+        return "PUPPET: "..playerName
+    end
+end
+
+-- ============================
+-- FUNCIONES DE HIGHLIGHT
+-- ============================
+
+local infectedModelNames = {
+    "Infant","Mature","Puppeteer","Injector","Beacon",
+    "Explosive","Broodling","Broodlord","Flyer","Tendril"
+}
+
+local colorsByModel = {
+    Infant     = Color3.fromRGB(0,255,0),
+    Mature     = Color3.fromRGB(0,200,0),
+    Puppeteer  = Color3.fromRGB(0,0,255),
+    Injector   = Color3.fromRGB(255,0,255),
+    Beacon     = Color3.fromRGB(255,255,0),
+    Explosive  = Color3.fromRGB(255,0,0),
+    Broodling  = Color3.fromRGB(255,128,0),
+    Broodlord  = Color3.fromRGB(128,0,128),
+    Flyer      = Color3.fromRGB(0,255,255),
+    Tendril    = Color3.fromRGB(150,75,0)
+}
+
+local COLORS = {
+    INFECTED = Color3.fromRGB(255,0,0),
+    PUPPET = Color3.fromRGB(0,100,255)
+}
+
+local function isInInfectedTeam(character)
+    if not character then return false end
+    for _, plr in ipairs(game.Players:GetPlayers()) do
+        if plr.Character == character then
+            return plr.Team and plr.Team.Name == "Infected"
+        end
+    end
+    return false
+end
+
+local function getInfectionType(character)
+    if not character then return nil end
+    local infectionType = character:FindFirstChild("InfectionType")
+    if infectionType then
+        if infectionType:IsA("StringValue") then
+            return infectionType.Value
+        elseif infectionType:IsA("BoolValue") then
+            return infectionType.Value and "true" or "false"
+        elseif infectionType:IsA("NumberValue") then
+            return tostring(infectionType.Value)
+        end
+    end
+    return nil
+end
+
+local function hasPuppetTrue(character)
+    if not character then return false end
+    local puppetValue = character:FindFirstChild("Puppet")
+    if puppetValue and puppetValue:IsA("BoolValue") then
+        return puppetValue.Value == true
+    end
+    return false
+end
+
+local function applyHighlightWithName(target, customName, customColor)
+    if not target or not target.Parent then return end
+    
+    task.wait(0.1)
+    
+    local highlightColor = customColor or colorsByModel[target.Name] or Color3.fromRGB(255,255,255)
+    local displayName = customName or target.Name
+    
+    local existingHl = target:FindFirstChildOfClass("Highlight")
+    if existingHl then existingHl:Destroy() end
+    
+    local hl = Instance.new("Highlight")
+    hl.FillColor = highlightColor
+    hl.OutlineColor = Color3.fromRGB(255,255,255)
+    hl.FillTransparency = 0.3
+    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent = target
+    
+    local primaryPart = target.PrimaryPart or target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Torso") or target:FindFirstChild("Head")
+    if primaryPart then
+        local hl2 = Instance.new("Highlight")
+        hl2.FillColor = highlightColor
+        hl2.OutlineColor = Color3.fromRGB(255,255,255)
+        hl2.FillTransparency = 0.3
+        hl2.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        hl2.Parent = primaryPart
+    end
+    
+    local existingTag = target:FindFirstChild("NameTag")
+    if existingTag then existingTag:Destroy() end
+    
+    local attachment = primaryPart or target:FindFirstChildWhichIsA("BasePart")
+    if attachment then
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "NameTag"
+        billboard.Size = UDim2.new(0,130,0,20)
+        billboard.StudsOffset = Vector3.new(0,3,0)
+        billboard.AlwaysOnTop = true
+        billboard.Parent = attachment
+        
+        local nameLabel = Instance.new("TextLabel", billboard)
+        nameLabel.Size = UDim2.new(1,0,1,0)
+        nameLabel.BackgroundTransparency = 0.5
+        nameLabel.BackgroundColor3 = Color3.fromRGB(0,0,0)
+        nameLabel.Text = displayName
+        nameLabel.TextColor3 = highlightColor
+        nameLabel.TextStrokeTransparency = 0
+        nameLabel.TextStrokeColor3 = Color3.fromRGB(0,0,0)
+        nameLabel.Font = Enum.Font.Roboto
+        nameLabel.TextSize = 14
+    end
+end
+
+local function removeHighlight(target)
+    if not target then return end
+    
+    local hl = target:FindFirstChildOfClass("Highlight")
+    if hl then hl:Destroy() end
+    
+    for _, part in ipairs(target:GetDescendants()) do
+        if part:IsA("BasePart") or part:IsA("Model") then
+            local partHl = part:FindFirstChildOfClass("Highlight")
+            if partHl then partHl:Destroy() end
+            
+            local nameTag = part:FindFirstChild("NameTag")
+            if nameTag then nameTag:Destroy() end
+        end
+    end
+    
+    local nameTag = target:FindFirstChild("NameTag")
+    if nameTag then nameTag:Destroy() end
+end
+
+local function updateAllHighlights()
+    print("[Highlights] Actualizando highlights")
+    
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child:IsA("Model") then
+            removeHighlight(child)
+        end
+    end
+    
+    for _, child in ipairs(workspace:GetChildren()) do
+        if not child:IsA("Model") then continue end
+        
+        if highlights.npc and table.find(infectedModelNames, child.Name) then
+            applyHighlightWithName(child)
+        end
+        
+        if child:FindFirstChild("Humanoid") then
+            local playerName = "Unknown"
+            local playerObj = nil
+            for _, plr in ipairs(game.Players:GetPlayers()) do
+                if plr.Character == child then
+                    playerName = plr.Name
+                    playerObj = plr
+                    break
+                end
+            end
+            
+            if highlights.puppet and hasPuppetTrue(child) then
+                local displayName = getPuppetDisplayName(child, playerName)
+                applyHighlightWithName(child, displayName, COLORS.PUPPET)
+            elseif highlights.infected and playerObj and playerObj.Team and playerObj.Team.Name == "Infected" then
+                local infectionType = getInfectionType(child)
+                local displayText = "INFECTED: "..playerName
+                if infectionType and infectionType ~= "" then
+                    displayText = displayText.." ["..infectionType.."]"
+                end
+                applyHighlightWithName(child, displayText, COLORS.INFECTED)
+            end
+        end
+    end
+end
+
+-- ============================
+-- SISTEMA DE APUNTADO CON PREDICCIÓN
+-- ============================
+
+local targetingEnabled = false
+local currentTarget = nil
+local targetHighlight = nil
+local targetConnection = nil
+local camera = workspace.CurrentCamera
+local aimSmoothness = 0.15 -- Un poco más rápido para mejor respuesta
+
+-- Variables para predicción
+local lastTargetPosition = nil
+local lastTargetTime = nil
+local targetVelocity = Vector3.new(0,0,0)
+
+local parasiteModels = {
+    "Infant", "Mature", "Puppeteer", "Injector", "Beacon",
+    "Explosive", "Broodling", "Broodlord", "Flyer", "Tendril"
+}
+
+local MAX_TARGET_DISTANCE = 100
+local SHOOT_DAMAGE = 25
+local PREDICTION_FACTOR = 0.5 -- Factor de predicción (0 = sin predicción, 1 = predicción completa)
+
+-- Obtener la HEAD del modelo
+local function getTargetHead(target)
+    if not target then return nil end
+    
+    local head = target:FindFirstChild("Head")
+    if head and head:IsA("BasePart") then
+        return head
+    end
+    
+    for _, child in ipairs(target:GetDescendants()) do
+        if child.Name == "Head" and child:IsA("BasePart") then
+            return child
+        end
+    end
+    
+    return nil
+end
+
+-- Calcular velocidad del objetivo
+local function updateTargetVelocity(target)
+    if not target then 
+        targetVelocity = Vector3.new(0,0,0)
+        return
+    end
+    
+    local head = getTargetHead(target)
+    if not head then 
+        targetVelocity = Vector3.new(0,0,0)
+        return
+    end
+    
+    local currentPos = head.Position
+    local currentTime = tick()
+    
+    if lastTargetPosition and lastTargetTime then
+        local dt = currentTime - lastTargetTime
+        if dt > 0 then
+            targetVelocity = (currentPos - lastTargetPosition) / dt
+        end
+    end
+    
+    lastTargetPosition = currentPos
+    lastTargetTime = currentTime
+end
+
+-- Predecir posición futura de la HEAD
+local function getPredictedHeadPosition(target)
+    if not target then return nil end
+    
+    local head = getTargetHead(target)
+    if not head then return nil end
+    
+    -- Usar velocidad para predecir posición futura
+    local predictionTime = 0.1 -- Predecir 0.1 segundos en el futuro
+    local predictedPos = head.Position + targetVelocity * predictionTime * PREDICTION_FACTOR
+    
+    return predictedPos
+end
+
+-- Encontrar el parásito más cercano
+local function findClosestParasite()
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return nil
+    end
+    
+    local playerPos = player.Character.HumanoidRootPart.Position
+    local closestDistance = MAX_TARGET_DISTANCE
+    local closestParasite = nil
+    
+    for _, child in ipairs(workspace:GetChildren()) do
+        if child:IsA("Model") and table.find(parasiteModels, child.Name) then
+            local head = getTargetHead(child)
+            if head then
+                local distance = (playerPos - head.Position).Magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestParasite = child
+                end
+            end
+        end
+    end
+    
+    return closestParasite
+end
+
+-- Apuntar a la posición predicha de la HEAD
+local function aimAtPredictedHead(target)
+    if not target or not camera then return end
+    
+    -- Actualizar velocidad del objetivo
+    updateTargetVelocity(target)
+    
+    -- Obtener posición predicha
+    local predictedPos = getPredictedHeadPosition(target)
+    if not predictedPos then return end
+    
+    local cameraPos = camera.CFrame.Position
+    local desiredCFrame = CFrame.lookAt(cameraPos, predictedPos)
+    
+    camera.CFrame = camera.CFrame:Lerp(desiredCFrame, aimSmoothness)
+end
+
+-- Disparar al objetivo
+local function shootCurrentTarget()
+    if not currentTarget then 
+        print("[Target] No hay objetivo")
+        return false 
+    end
+    
+    local humanoid = currentTarget:FindFirstChild("Humanoid")
+    if not humanoid then
+        humanoid = currentTarget:FindFirstChildWhichIsA("Humanoid")
+    end
+    
+    if humanoid then
+        local newHealth = humanoid.Health - SHOOT_DAMAGE
+        if newHealth <= 0 then
+            humanoid.Health = 0
+            print("[Disparo] Parásito eliminado: "..currentTarget.Name)
+            
+            if targetingEnabled then
+                currentTarget = nil
+                if targetHighlight then
+                    targetHighlight:Destroy()
+                    targetHighlight = nil
+                end
+            end
+        else
+            humanoid.Health = newHealth
+            print("[Disparo] Daño aplicado a "..currentTarget.Name..": "..SHOOT_DAMAGE.." puntos")
+            
+            -- Efecto visual en la posición predicha
+            local head = getTargetHead(currentTarget)
+            if head then
+                local impactPart = Instance.new("Part")
+                impactPart.Size = Vector3.new(1, 1, 1)
+                impactPart.Position = head.Position
+                impactPart.Anchored = true
+                impactPart.CanCollide = false
+                impactPart.Transparency = 0.5
+                impactPart.BrickColor = BrickColor.new("Bright red")
+                impactPart.Parent = workspace
+                
+                game:GetService("Debris"):AddItem(impactPart, 0.2)
+            end
+        end
+        return true
+    end
+    return false
+end
+
+-- Actualizar highlight
+local function updateTargetHighlight()
+    if targetHighlight then
+        targetHighlight:Destroy()
+        targetHighlight = nil
+    end
+    
+    if currentTarget then
+        targetHighlight = Instance.new("Highlight")
+        targetHighlight.FillColor = CONFIG.colors.target_color
+        targetHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        targetHighlight.FillTransparency = 0.2
+        targetHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        targetHighlight.Parent = currentTarget
+    end
+end
+
+-- Loop principal
+local function targetingLoop()
+    while targetingEnabled do
+        local newTarget = findClosestParasite()
+        
+        if newTarget ~= currentTarget then
+            currentTarget = newTarget
+            updateTargetHighlight()
+            
+            if currentTarget then
+                print("[Target] Nuevo objetivo: "..currentTarget.Name)
+                -- Resetear velocidad al cambiar de objetivo
+                targetVelocity = Vector3.new(0,0,0)
+                lastTargetPosition = nil
+            end
+        end
+        
+        if currentTarget then
+            aimAtPredictedHead(currentTarget)
+        end
+        
+        task.wait(0.03)
+    end
+    
+    currentTarget = nil
+    if targetHighlight then
+        targetHighlight:Destroy()
+        targetHighlight = nil
+    end
+end
+
+-- Activar/Desactivar
+local function setTargetingEnabled(enabled)
+    if enabled == targetingEnabled then return end
+    
+    targetingEnabled = enabled
+    
+    if targetingEnabled then
+        print("[Target] Sistema de apuntado ACTIVADO (con predicción)")
+        
+        task.spawn(targetingLoop)
+        
+        targetConnection = game:GetService("UserInputService").InputBegan:Connect(function(input)
+            if targetingEnabled and input.UserInputType == Enum.UserInputType.MouseButton1 then
+                shootCurrentTarget()
+            end
+        end)
+    else
+        print("[Target] Sistema de apuntado DESACTIVADO")
+        if targetConnection then
+            targetConnection:Disconnect()
+            targetConnection = nil
+        end
+    end
+end
+
+-- ============================
+-- EVENTOS DEL JUEGO
+-- ============================
+
+player.CharacterAdded:Connect(function(char)
+    if scriptActive then
+        loopThread = coroutine.wrap(startLoop)
+        loopThread(char)
+    end
+    
+    task.wait(0.5)
+    watchInfectionType()
+    
+    if player.Team and player.Team.Name == "Infected" then
+        killAfterDelay(char)
+    end
+end)
+
+player:GetPropertyChangedSignal("Team"):Connect(function()
+    if player.Team and player.Team.Name == "Infected" then
+        if player.Character then
+            killAfterDelay(player.Character)
+        end
+    else
+        cancelDeath()
+    end
+end)
+
+task.wait(1)
+watchInfectionType()
+
+workspace.ChildAdded:Connect(function(child)
+    task.wait(0.5)
+    
+    if not child:IsA("Model") then return end
+    
+    if highlights.npc and table.find(infectedModelNames, child.Name) then
+        applyHighlightWithName(child)
+    end
+    
+    if child:FindFirstChild("Humanoid") then
+        local playerName = "Unknown"
+        local playerObj = nil
+        for _, plr in ipairs(game.Players:GetPlayers()) do
+            if plr.Character == child then
+                playerName = plr.Name
+                playerObj = plr
+                break
+            end
+        end
+        
+        if highlights.puppet and hasPuppetTrue(child) then
+            local displayName = getPuppetDisplayName(child, playerName)
+            applyHighlightWithName(child, displayName, COLORS.PUPPET)
+        elseif highlights.infected and playerObj and playerObj.Team and playerObj.Team.Name == "Infected" then
+            local infectionType = getInfectionType(child)
+            local displayText = "INFECTED: "..playerName
+            if infectionType and infectionType ~= "" then
+                displayText = displayText.." ["..infectionType.."]"
+            end
+            applyHighlightWithName(child, displayText, COLORS.INFECTED)
+        end
+    end
+end)
+
+-- ============================
+-- SECCIÓN HOME
+-- ============================
+
+local function showHome()
+    ContentFrame:ClearAllChildren()
+    
+    local timeLabel = Instance.new("TextLabel", ContentFrame)
+    timeLabel.Size = UDim2.new(1,0,0.15,0)
+    timeLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    timeLabel.Font = Enum.Font.Roboto
+    timeLabel.TextScaled = true
+    timeLabel.BackgroundTransparency = 1
+    
+    local serverLabel = Instance.new("TextLabel", ContentFrame)
+    serverLabel.Size = UDim2.new(1,0,0.15,0)
+    serverLabel.Position = UDim2.new(0,0,0.2,0)
+    serverLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    serverLabel.Font = Enum.Font.Roboto
+    serverLabel.TextScaled = true
+    serverLabel.BackgroundTransparency = 1
+    
+    local desc = Instance.new("TextLabel", ContentFrame)
+    desc.Size = UDim2.new(1,0,0.6,0)
+    desc.Position = UDim2.new(0,0,0.4,0)
+    desc.Text = "HUNTINGTON PARASITE UI - SISTEMA DE APUNTADO CON PREDICCIÓN\n\n"..
+                "Características:\n"..
+                "🎯 APUNTADO PREDICTIVO - Compensa el movimiento\n"..
+                "🔫 Dispara con clic izquierdo\n"..
+                "📍 Highlight rojo en el objetivo\n"..
+                "⚡ Teletransporte, muerte automática, highlights\n\n"..
+                "Secciones:\n🏠 Home | 📦 Inventario | 📊 Stats | ⚙️ Opciones | 📚 Models"
+    desc.TextColor3 = Color3.fromRGB(255,255,255)
+    desc.Font = Enum.Font.Roboto
+    desc.TextScaled = true
+    desc.BackgroundTransparency = 1
+    desc.TextWrapped = true
+    
+    game:GetService("RunService").RenderStepped:Connect(function()
+        timeLabel.Text = "Local time: "..os.date("%X")
+        serverLabel.Text = "Server time: "..os.time()
+    end)
+end
+
+-- ============================
+-- SECCIÓN INVENTARIO
+-- ============================
+
+local function showInventory()
+    ContentFrame:ClearAllChildren()
+    
+    local function updateInventory()
+        ContentFrame:ClearAllChildren()
+        for _,item in ipairs(player.Backpack:GetChildren()) do
+            local label = Instance.new("TextLabel", ContentFrame)
+            label.Size = UDim2.new(1,0,0,30)
+            label.Text = "Item: "..item.Name
+            label.TextColor3 = Color3.fromRGB(255,255,255)
+            label.Font = Enum.Font.Roboto
+            label.TextScaled = true
+            label.BackgroundTransparency = 1
+        end
+    end
+    updateInventory()
+    player.Backpack.ChildAdded:Connect(updateInventory)
+    player.Backpack.ChildRemoved:Connect(updateInventory)
+end
+
+-- ============================
+-- SECCIÓN STATS
+-- ============================
+
+local function showStats()
+    ContentFrame:ClearAllChildren()
+    
+    local nameLabel = Instance.new("TextLabel", ContentFrame)
+    nameLabel.Size = UDim2.new(1,0,0.12,0)
+    nameLabel.Text = "Name: "..player.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    nameLabel.Font = Enum.Font.Roboto
+    nameLabel.TextScaled = true
+    nameLabel.BackgroundTransparency = 1
+    
+    local healthLabel = Instance.new("TextLabel", ContentFrame)
+    healthLabel.Size = UDim2.new(1,0,0.12,0)
+    healthLabel.Position = UDim2.new(0,0,0.15,0)
+    healthLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    healthLabel.Font = Enum.Font.Roboto
+    healthLabel.TextScaled = true
+    healthLabel.BackgroundTransparency = 1
+    
+    local speedLabel = Instance.new("TextLabel", ContentFrame)
+    speedLabel.Size = UDim2.new(1,0,0.12,0)
+    speedLabel.Position = UDim2.new(0,0,0.3,0)
+    speedLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    speedLabel.Font = Enum.Font.Roboto
+    speedLabel.TextScaled = true
+    speedLabel.BackgroundTransparency = 1
+    
+    local infectionLabel = Instance.new("TextLabel", ContentFrame)
+    infectionLabel.Size = UDim2.new(1,0,0.12,0)
+    infectionLabel.Position = UDim2.new(0,0,0.45,0)
+    infectionLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    infectionLabel.Font = Enum.Font.Roboto
+    infectionLabel.TextScaled = true
+    infectionLabel.BackgroundTransparency = 1
+    
+    local puppetLevelLabel = Instance.new("TextLabel", ContentFrame)
+    puppetLevelLabel.Size = UDim2.new(1,0,0.12,0)
+    puppetLevelLabel.Position = UDim2.new(0,0,0.6,0)
+    puppetLevelLabel.TextColor3 = Color3.fromRGB(0,255,255)
+    puppetLevelLabel.Font = Enum.Font.Roboto
+    puppetLevelLabel.TextScaled = true
+    puppetLevelLabel.BackgroundTransparency = 1
+    
+    local deathStatusLabel = Instance.new("TextLabel", ContentFrame)
+    deathStatusLabel.Size = UDim2.new(1,0,0.12,0)
+    deathStatusLabel.Position = UDim2.new(0,0,0.75,0)
+    deathStatusLabel.TextColor3 = Color3.fromRGB(255,255,0)
+    deathStatusLabel.Font = Enum.Font.Roboto
+    deathStatusLabel.TextScaled = true
+    deathStatusLabel.BackgroundTransparency = 1
+    deathStatusLabel.Text = "Death Status: Not active"
+    
+    local function updateDeathStatus()
+        if deathActive then
+            deathStatusLabel.Text = "Death Status: ACTIVE (2 sec)"
+            deathStatusLabel.TextColor3 = Color3.fromRGB(255,0,0)
+        else
+            deathStatusLabel.Text = "Death Status: Not active"
+            deathStatusLabel.TextColor3 = Color3.fromRGB(0,255,0)
+        end
+    end
+    
+    local function connectDeathStatus()
+        spawn(function()
+            while true do
+                updateDeathStatus()
+                task.wait(0.5)
+            end
+        end)
+    end
+    connectDeathStatus()
+    
+    local function connectHumanoid(humanoid)
+        humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+            healthLabel.Text = "Health: "..math.floor(humanoid.Health)
+        end)
+        humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            speedLabel.Text = "Speed: "..humanoid.WalkSpeed
+            if player.Character then
+                local level = getPuppetLevel(player.Character)
+                if level > 0 then
+                    puppetLevelLabel.Text = "Puppet Level: "..level
+                else
+                    puppetLevelLabel.Text = "Puppet Level: None"
+                end
+            end
+        end)
+        healthLabel.Text = "Health: "..math.floor(humanoid.Health)
+        speedLabel.Text = "Speed: "..humanoid.WalkSpeed
+    end
+    
+    local function updateInfectionLabel()
+        local infType = getMyInfectionType()
+        if infType then
+            infectionLabel.Text = "Infection Type: "..infType
+        else
+            infectionLabel.Text = "Infection Type: None"
+        end
+    end
+    
+    local function updatePuppetLevel()
+        if player.Character then
+            local level = getPuppetLevel(player.Character)
+            if level > 0 then
+                puppetLevelLabel.Text = "Puppet Level: "..level
+            else
+                puppetLevelLabel.Text = "Puppet Level: None"
+            end
+        end
+    end
+    
+    updateInfectionLabel()
+    updatePuppetLevel()
+    
+    if player.Character then
+        local infectionValue = player.Character:FindFirstChild("InfectionType")
+        if infectionValue then
+            infectionValue.Changed:Connect(updateInfectionLabel)
+        end
+        
+        player.Character.ChildAdded:Connect(function(child)
+            if child.Name == "InfectionType" then
+                child.Changed:Connect(updateInfectionLabel)
+                updateInfectionLabel()
+            end
+            if child.Name == "PuppetEvolution1" or child:IsA("Tool") then
+                task.wait(0.1)
+                updatePuppetLevel()
+            end
+        end)
+        
+        local puppetValue = player.Character:FindFirstChild("Puppet")
+        if puppetValue then
+            puppetValue.Changed:Connect(updatePuppetLevel)
+        end
+        
+        local evolutionModel = player.Character:FindFirstChild("PuppetEvolution1")
+        if evolutionModel then
+            evolutionModel.ChildAdded:Connect(function(child)
+                if child.Name == "TorsoSetter" then
+                    task.wait(0.1)
+                    updatePuppetLevel()
+                end
+            end)
+        end
+    end
+    
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        connectHumanoid(player.Character.Humanoid)
+    end
+    
+    player.CharacterAdded:Connect(function(char)
+        local hum = char:WaitForChild("Humanoid")
+        connectHumanoid(hum)
+        
+        task.wait(0.5)
+        local infValue = char:FindFirstChild("InfectionType")
+        if infValue then
+            infValue.Changed:Connect(updateInfectionLabel)
+        end
+        char.ChildAdded:Connect(function(child)
+            if child.Name == "InfectionType" then
+                child.Changed:Connect(updateInfectionLabel)
+                updateInfectionLabel()
+            end
+            if child.Name == "PuppetEvolution1" or child:IsA("Tool") then
+                task.wait(0.1)
+                updatePuppetLevel()
+            end
+        end)
+        updateInfectionLabel()
+        updatePuppetLevel()
+    end)
+end
+
+-- ============================
+-- SECCIÓN OPCIONES
+-- ============================
+
+local function showOptions()
+    createScrollingSection(ContentFrame, "⚙️ Opciones", function(scrollFrame, layout)
+        local order = 1
+        
+        -- Estado del script
+        local statusLabel = Instance.new("TextLabel", scrollFrame)
+        statusLabel.Size = UDim2.new(0.8, 0, 0, 25)
+        statusLabel.BackgroundTransparency = 1
+        statusLabel.Text = "Script: "..(scriptActive and "ACTIVADO" or "DESACTIVADO")
+        statusLabel.TextColor3 = scriptActive and CONFIG.colors.button_success or CONFIG.colors.button_danger
+        statusLabel.Font = Enum.Font.Roboto
+        statusLabel.TextScaled = true
+        statusLabel.LayoutOrder = order
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, scriptActive and "⛔ Desactivar" or "✅ Activar", function(btn)
+            scriptActive = not scriptActive
+            statusLabel.Text = "Script: "..(scriptActive and "ACTIVADO" or "DESACTIVADO")
+            statusLabel.TextColor3 = scriptActive and CONFIG.colors.button_success or CONFIG.colors.button_danger
+            btn.Text = scriptActive and "⛔ Desactivar" or "✅ Activar"
+            
+            if scriptActive then
+                print("[Script] Activado")
+                if player.Character then
+                    loopThread = coroutine.wrap(startLoop)
+                    loopThread(player.Character)
+                end
+            else
+                print("[Script] Desactivado")
+            end
+        end, scriptActive and CONFIG.colors.button_success or CONFIG.colors.button_danger, order)
+        order = order + 1
+        
+        local sep1 = Instance.new("Frame", scrollFrame)
+        sep1.Size = UDim2.new(0.8, 0, 0, 1)
+        sep1.BackgroundColor3 = CONFIG.colors.text
+        sep1.BackgroundTransparency = 0.7
+        sep1.LayoutOrder = order
+        order = order + 1
+        
+        -- SISTEMA DE APUNTADO CON PREDICCIÓN
+        local targetTitle = Instance.new("TextLabel", scrollFrame)
+        targetTitle.Size = UDim2.new(0.8, 0, 0, 20)
+        targetTitle.BackgroundTransparency = 1
+        targetTitle.Text = "🎯 APUNTADO PREDICTIVO"
+        targetTitle.TextColor3 = CONFIG.colors.accent
+        targetTitle.Font = Enum.Font.Roboto
+        targetTitle.TextScaled = true
+        targetTitle.LayoutOrder = order
+        order = order + 1
+        
+        local targetStateLabel = Instance.new("TextLabel", scrollFrame)
+        targetStateLabel.Size = UDim2.new(0.8, 0, 0, 20)
+        targetStateLabel.BackgroundTransparency = 1
+        targetStateLabel.Text = targetingEnabled and "ACTIVADO" or "DESACTIVADO"
+        targetStateLabel.TextColor3 = targetingEnabled and CONFIG.colors.button_success or CONFIG.colors.button_danger
+        targetStateLabel.Font = Enum.Font.Roboto
+        targetStateLabel.TextScaled = true
+        targetStateLabel.LayoutOrder = order
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, targetingEnabled and "🔴 Desactivar" or "🟢 Activar", function(btn)
+            setTargetingEnabled(not targetingEnabled)
+            targetStateLabel.Text = targetingEnabled and "ACTIVADO" or "DESACTIVADO"
+            targetStateLabel.TextColor3 = targetingEnabled and CONFIG.colors.button_success or CONFIG.colors.button_danger
+            btn.Text = targetingEnabled and "🔴 Desactivar" or "🟢 Activar"
+        end, targetingEnabled and CONFIG.colors.button_success or CONFIG.colors.button_danger, order)
+        order = order + 1
+        
+        local targetInfo = Instance.new("TextLabel", scrollFrame)
+        targetInfo.Size = UDim2.new(0.8, 0, 0, 30)
+        targetInfo.BackgroundTransparency = 1
+        targetInfo.Text = "Daño: "..SHOOT_DAMAGE.." | Alcance: "..MAX_TARGET_DISTANCE.." | Predicción: Sí"
+        targetInfo.TextColor3 = CONFIG.colors.text
+        targetInfo.Font = Enum.Font.Roboto
+        targetInfo.TextScaled = true
+        targetInfo.LayoutOrder = order
+        order = order + 1
+        
+        local sep2 = Instance.new("Frame", scrollFrame)
+        sep2.Size = UDim2.new(0.8, 0, 0, 1)
+        sep2.BackgroundColor3 = CONFIG.colors.text
+        sep2.BackgroundTransparency = 0.7
+        sep2.LayoutOrder = order
+        order = order + 1
+        
+        -- CONTROLES DE MUERTE
+        local deathLabel = Instance.new("TextLabel", scrollFrame)
+        deathLabel.Size = UDim2.new(0.8, 0, 0, 20)
+        deathLabel.BackgroundTransparency = 1
+        deathLabel.Text = "💀 MUERTE"
+        deathLabel.TextColor3 = CONFIG.colors.accent
+        deathLabel.Font = Enum.Font.Roboto
+        deathLabel.TextScaled = true
+        deathLabel.LayoutOrder = order
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, "❌ Cancelar Muerte", function(btn)
+            local cancelled = cancelDeath()
+            if cancelled then
+                btn.BackgroundColor3 = CONFIG.colors.button_success
+                btn.Text = "✓ Cancelada"
+                task.wait(1)
+                btn.BackgroundColor3 = CONFIG.colors.button_danger
+                btn.Text = "❌ Cancelar Muerte"
+            else
+                local oldColor = btn.BackgroundColor3
+                btn.BackgroundColor3 = CONFIG.colors.button_warning
+                btn.Text = "⚠ Sin Muerte"
+                task.wait(1)
+                btn.BackgroundColor3 = oldColor
+                btn.Text = "❌ Cancelar Muerte"
+            end
+        end, CONFIG.colors.button_danger, order)
+        order = order + 1
+        
+        local sep3 = Instance.new("Frame", scrollFrame)
+        sep3.Size = UDim2.new(0.8, 0, 0, 1)
+        sep3.BackgroundColor3 = CONFIG.colors.text
+        sep3.BackgroundTransparency = 0.7
+        sep3.LayoutOrder = order
+        order = order + 1
+        
+        -- CONTROLES DE HIGHLIGHT
+        local highlightLabel = Instance.new("TextLabel", scrollFrame)
+        highlightLabel.Size = UDim2.new(0.8, 0, 0, 20)
+        highlightLabel.BackgroundTransparency = 1
+        highlightLabel.Text = "🎨 HIGHLIGHTS"
+        highlightLabel.TextColor3 = CONFIG.colors.accent
+        highlightLabel.Font = Enum.Font.Roboto
+        highlightLabel.TextScaled = true
+        highlightLabel.LayoutOrder = order
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, (highlights.npc and "✅" or "❌").." NPCs", function(btn)
+            highlights.npc = not highlights.npc
+            btn.BackgroundColor3 = highlights.npc and CONFIG.colors.button_success or CONFIG.colors.button_danger
+            btn.Text = (highlights.npc and "✅" or "❌").." NPCs"
+            updateAllHighlights()
+        end, highlights.npc and CONFIG.colors.button_success or CONFIG.colors.button_danger, order)
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, (highlights.infected and "✅" or "❌").." Infectados", function(btn)
+            highlights.infected = not highlights.infected
+            btn.BackgroundColor3 = highlights.infected and CONFIG.colors.button_success or CONFIG.colors.button_danger
+            btn.Text = (highlights.infected and "✅" or "❌").." Infectados"
+            updateAllHighlights()
+        end, highlights.infected and CONFIG.colors.button_success or CONFIG.colors.button_danger, order)
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, (highlights.puppet and "✅" or "❌").." Puppets", function(btn)
+            highlights.puppet = not highlights.puppet
+            btn.BackgroundColor3 = highlights.puppet and CONFIG.colors.button_success or CONFIG.colors.button_danger
+            btn.Text = (highlights.puppet and "✅" or "❌").." Puppets"
+            updateAllHighlights()
+        end, highlights.puppet and CONFIG.colors.button_success or CONFIG.colors.button_danger, order)
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, "🔄 Actualizar", function(btn)
+            updateAllHighlights()
+            btn.BackgroundColor3 = CONFIG.colors.button_success
+            btn.Text = "✓ OK"
+            task.wait(0.5)
+            btn.BackgroundColor3 = CONFIG.colors.button_info
+            btn.Text = "🔄 Actualizar"
+        end, CONFIG.colors.button_info, order)
+        order = order + 1
+        
+        local sep4 = Instance.new("Frame", scrollFrame)
+        sep4.Size = UDim2.new(0.8, 0, 0, 1)
+        sep4.BackgroundColor3 = CONFIG.colors.text
+        sep4.BackgroundTransparency = 0.7
+        sep4.LayoutOrder = order
+        order = order + 1
+        
+        -- ACCIONES MANUALES
+        local manualLabel = Instance.new("TextLabel", scrollFrame)
+        manualLabel.Size = UDim2.new(0.8, 0, 0, 20)
+        manualLabel.BackgroundTransparency = 1
+        manualLabel.Text = "🖱️ MANUAL"
+        manualLabel.TextColor3 = CONFIG.colors.accent
+        manualLabel.Font = Enum.Font.Roboto
+        manualLabel.TextScaled = true
+        manualLabel.LayoutOrder = order
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, "👾 Highlight NPCs", function(btn)
+            local count = 0
+            for _, child in ipairs(workspace:GetChildren()) do
+                if table.find(infectedModelNames, child.Name) and child:IsA("Model") then
+                    applyHighlightWithName(child)
+                    count = count + 1
+                end
+            end
+            btn.BackgroundColor3 = CONFIG.colors.button_success
+            btn.Text = "✓ "..count.." NPCs"
+            task.wait(1)
+            btn.BackgroundColor3 = CONFIG.colors.button_info
+            btn.Text = "👾 Highlight NPCs"
+        end, CONFIG.colors.button_info, order)
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, "👤 Highlight Jugadores", function(btn)
+            local count = 0
+            for _, child in ipairs(workspace:GetChildren()) do
+                if child:IsA("Model") and child:FindFirstChild("Humanoid") then
+                    local playerName = "Unknown"
+                    local playerObj = nil
+                    for _, plr in ipairs(game.Players:GetPlayers()) do
+                        if plr.Character == child then
+                            playerName = plr.Name
+                            playerObj = plr
+                            break
+                        end
+                    end
+                    
+                    if hasPuppetTrue(child) then
+                        local displayName = getPuppetDisplayName(child, playerName)
+                        applyHighlightWithName(child, displayName, COLORS.PUPPET)
+                        count = count + 1
+                    elseif playerObj and playerObj.Team and playerObj.Team.Name == "Infected" then
+                        local infectionType = getInfectionType(child)
+                        local displayText = "INFECTED: "..playerName
+                        if infectionType and infectionType ~= "" then
+                            displayText = displayText.." ["..infectionType.."]"
+                        end
+                        applyHighlightWithName(child, displayText, COLORS.INFECTED)
+                        count = count + 1
+                    end
+                end
+            end
+            btn.BackgroundColor3 = CONFIG.colors.button_success
+            btn.Text = "✓ "..count.." Jugadores"
+            task.wait(1)
+            btn.BackgroundColor3 = CONFIG.colors.button_info
+            btn.Text = "👤 Highlight Jugadores"
+        end, CONFIG.colors.button_info, order)
+        order = order + 1
+        
+        createScrollingButton(scrollFrame, "🗑️ Quitar Todos", function(btn)
+            local count = 0
+            for _, child in ipairs(workspace:GetChildren()) do
+                if child:IsA("Model") then
+                    removeHighlight(child)
+                    count = count + 1
+                end
+            end
+            btn.BackgroundColor3 = CONFIG.colors.button_success
+            btn.Text = "✓ "..count.." modelos"
+            task.wait(1)
+            btn.BackgroundColor3 = CONFIG.colors.button_danger
+            btn.Text = "🗑️ Quitar Todos"
+        end, CONFIG.colors.button_danger, order)
+    end)
+end
+
+-- ============================
+-- SECCIÓN MODELS
+-- ============================
+
+local function showModels()
+    ContentFrame:ClearAllChildren()
+
+    local title = Instance.new("TextLabel", ContentFrame)
+    title.Size = UDim2.new(1,0,0.08,0)
+    title.Text = "Infected Types and Their Colors"
+    title.TextColor3 = Color3.fromRGB(255,255,255)
+    title.Font = Enum.Font.Roboto
+    title.TextScaled = true
+    title.BackgroundTransparency = 1
+
+    local listFrame = Instance.new("ScrollingFrame", ContentFrame)
+    listFrame.Size = UDim2.new(1,0,0.9,0)
+    listFrame.Position = UDim2.new(0,0,0.1,0)
+    listFrame.BackgroundTransparency = 1
+    listFrame.BorderSizePixel = 0
+    listFrame.ScrollBarThickness = 10
+    listFrame.ScrollBarImageColor3 = Color3.fromRGB(100,100,100)
+    listFrame.CanvasSize = UDim2.new(0,0,0,0)
+
+    local layout = Instance.new("UIListLayout", listFrame)
+    layout.Padding = UDim.new(0,10)
+    layout.SortOrder = Enum.SortOrder.Name
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        listFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 20)
+    end)
+
+    local colors = {
+        Infant     = Color3.fromRGB(0,255,0),
+        Mature     = Color3.fromRGB(0,200,0),
+        Puppeteer  = Color3.fromRGB(0,0,255),
+        Injector   = Color3.fromRGB(255,0,255),
+        Beacon     = Color3.fromRGB(255,255,0),
+        Explosive  = Color3.fromRGB(255,0,0),
+        Broodling  = Color3.fromRGB(255,128,0),
+        Broodlord  = Color3.fromRGB(128,0,128),
+        Flyer      = Color3.fromRGB(0,255,255),
+        Tendril    = Color3.fromRGB(150,75,0)
+    }
+
+    -- Infected Team Player
+    local infectedSection = Instance.new("Frame", listFrame)
+    infectedSection.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    infectedSection.BorderSizePixel = 0
+    infectedSection.Size = UDim2.new(1,-10,0,50)
+
+    local infectedColorBox = Instance.new("Frame", infectedSection)
+    infectedColorBox.Size = UDim2.new(0,30,0,30)
+    infectedColorBox.Position = UDim2.new(0,5,0.5,-15)
+    infectedColorBox.BackgroundColor3 = Color3.fromRGB(255,0,0)
+    infectedColorBox.BorderSizePixel = 0
+
+    local infectedLabel = Instance.new("TextLabel", infectedSection)
+    infectedLabel.Size = UDim2.new(0.5,0,1,0)
+    infectedLabel.Position = UDim2.new(0,45,0,0)
+    infectedLabel.Text = "Infected Team Player (shows InfectionType)"
+    infectedLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    infectedLabel.Font = Enum.Font.Roboto
+    infectedLabel.TextScaled = true
+    infectedLabel.BackgroundTransparency = 1
+    infectedLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Puppet Player con niveles
+    local puppetSection = Instance.new("Frame", listFrame)
+    puppetSection.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    puppetSection.BorderSizePixel = 0
+    puppetSection.Size = UDim2.new(1,-10,0,100)
+
+    local puppetColorBox = Instance.new("Frame", puppetSection)
+    puppetColorBox.Size = UDim2.new(0,30,0,30)
+    puppetColorBox.Position = UDim2.new(0,5,0.12,0)
+    puppetColorBox.BackgroundColor3 = Color3.fromRGB(0,100,255)
+    puppetColorBox.BorderSizePixel = 0
+
+    local puppetTitle = Instance.new("TextLabel", puppetSection)
+    puppetTitle.Size = UDim2.new(0.5,0,0.15,0)
+    puppetTitle.Position = UDim2.new(0,45,0,0)
+    puppetTitle.Text = "Puppet Player"
+    puppetTitle.TextColor3 = Color3.fromRGB(255,255,255)
+    puppetTitle.Font = Enum.Font.Roboto
+    puppetTitle.TextScaled = true
+    puppetTitle.BackgroundTransparency = 1
+    puppetTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Niveles de puppet
+    local level1Label = Instance.new("TextLabel", puppetSection)
+    level1Label.Size = UDim2.new(0.5,0,0.15,0)
+    level1Label.Position = UDim2.new(0,45,0.15,0)
+    level1Label.Text = "Lv.1 - Puppet = true"
+    level1Label.TextColor3 = Color3.fromRGB(200,200,200)
+    level1Label.Font = Enum.Font.Roboto
+    level1Label.TextScaled = true
+    level1Label.BackgroundTransparency = 1
+    level1Label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local level2Label = Instance.new("TextLabel", puppetSection)
+    level2Label.Size = UDim2.new(0.5,0,0.15,0)
+    level2Label.Position = UDim2.new(0,45,0.3,0)
+    level2Label.Text = "Lv.2 - PuppetEvolution1 + TorsoSetter (Slash)"
+    level2Label.TextColor3 = Color3.fromRGB(200,200,200)
+    level2Label.Font = Enum.Font.Roboto
+    level2Label.TextScaled = true
+    level2Label.BackgroundTransparency = 1
+    level2Label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local level3Label = Instance.new("TextLabel", puppetSection)
+    level3Label.Size = UDim2.new(0.5,0,0.15,0)
+    level3Label.Position = UDim2.new(0,45,0.45,0)
+    level3Label.Text = "Lv.3 - Punch ability"
+    level3Label.TextColor3 = Color3.fromRGB(200,200,200)
+    level3Label.Font = Enum.Font.Roboto
+    level3Label.TextScaled = true
+    level3Label.BackgroundTransparency = 1
+    level3Label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local level4Label = Instance.new("TextLabel", puppetSection)
+    level4Label.Size = UDim2.new(0.5,0,0.15,0)
+    level4Label.Position = UDim2.new(0,45,0.6,0)
+    level4Label.Text = "Lv.4 - Speed = 18"
+    level4Label.TextColor3 = Color3.fromRGB(200,200,200)
+    level4Label.Font = Enum.Font.Roboto
+    level4Label.TextScaled = true
+    level4Label.BackgroundTransparency = 1
+    level4Label.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- NPCs
+    for name, color in pairs(colors) do
+        local item = Instance.new("Frame", listFrame)
+        item.BackgroundColor3 = Color3.fromRGB(40,40,40)
+        item.BorderSizePixel = 0
+        item.Size = UDim2.new(1,-10,0,50)
+
+        local colorBox = Instance.new("Frame", item)
+        colorBox.Size = UDim2.new(0,30,0,30)
+        colorBox.Position = UDim2.new(0,5,0.5,-15)
+        colorBox.BackgroundColor3 = color
+        colorBox.BorderSizePixel = 0
+
+        local nameLabel = Instance.new("TextLabel", item)
+        nameLabel.Size = UDim2.new(0.5,0,1,0)
+        nameLabel.Position = UDim2.new(0,45,0,0)
+        nameLabel.Text = name
+        nameLabel.TextColor3 = Color3.fromRGB(255,255,255)
+        nameLabel.Font = Enum.Font.Roboto
+        nameLabel.TextScaled = true
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+    task.wait()
+    listFrame.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 20)
+end
+
+-- ============================
+-- SIDEBAR BUTTONS
+-- ============================
+
+local sections = {
+    {name="🏠 Home", func=showHome},
+    {name="📦 Inventory", func=showInventory},
+    {name="📊 Stats", func=showStats},
+    {name="⚙️ Options", func=showOptions},
+    {name="📚 Models", func=showModels}
+}
+
+Sidebar:ClearAllChildren()
+local UIList = Instance.new("UIListLayout", Sidebar)
+UIList.Padding = UDim.new(0,5)
+
+for _,section in ipairs(sections) do
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1,0,0,40)
+    btn.Text = section.name
+    btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Font = Enum.Font.Roboto
+    btn.TextScaled = true
+    btn.MouseButton1Click:Connect(function()
+        print("[Huntington Parasite] Navigation button clicked: "..section.name)
+        section.func()
+    end)
+end
+
+-- ============================
+-- CONTROL DE LA UI
+-- ============================
+
+LogoButton.MouseButton1Click:Connect(function()
+    print("[Huntington Parasite] UI Maximized")
+    MainFrame.Visible = true
+    MainFrame:TweenSize(CONFIG.sizes.main, "Out", "Quad", 0.3, true)
+end)
+
+MinButton.MouseButton1Click:Connect(function()
+    print("[Huntington Parasite] UI Minimized")
+    MainFrame:TweenSize(UDim2.new(0, 0, 0, 0), "Out", "Quad", 0.3, true, function()
+        MainFrame.Visible = false
+    end)
+end)
+
+-- Mostrar Home por defecto
+showHome()
+
+player.CharacterAdded:Connect(function(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    humanoid:GetPropertyChangedSignal("Health"):Connect(function()
+        if ContentFrame:FindFirstChildWhichIsA("TextLabel") then
+            showStats()
+        end
+    end)
+    humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        if ContentFrame:FindFirstChildWhichIsA("TextLabel") then
+            showStats()
+        end
+    end)
+end)
+
+-- Actualizar highlights iniciales
+task.wait(1)
+updateAllHighlights()
